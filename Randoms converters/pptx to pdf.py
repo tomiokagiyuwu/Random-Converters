@@ -42,6 +42,6 @@ def convert_pptx_to_pdf(input_path):
 
 
 # Put either a .pptx FILE or a FOLDER here
-input_path = r"C:\Users\Mayank Raj.LAPTOP-R5JI6HDP\Downloads\FOFA"
+input_path = r"enter the directory of folder"
 
 convert_pptx_to_pdf(input_path)
