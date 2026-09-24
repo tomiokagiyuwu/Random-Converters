@@ -1,22 +1,27 @@
+from pypdf import PdfWriter
 import os
-from pypdf import PdfMerger
+#bash pip install pypdf
 
-folder_path = r"enter target pdf"
+folder = r"enter the directory of folder"
 
-input_pdfs = [
-    os.path.join(folder_path, f)
-    for f in os.listdir(folder_path)
-    if f.lower().endswith(".pdf")
+writer = PdfWriter()
+
+pdf_files = [
+    f for f in os.listdir(folder)
+    if f.lower().endswith(".pdf") and f != "merged.pdf" #the merged pdf will be there in the same fodler as the original one
 ]
-input_pdfs.sort()
 
-output_pdf = os.path.join(folder_path, "merged_output.pdf")
+pdf_files.sort()
 
-merger = PdfMerger()
-for pdf in input_pdfs:
-  merger.append(pdf)
+for pdf in pdf_files:
+    path = os.path.join(folder, pdf)
+    print(f"Adding: {pdf}")
+    writer.append(path)
 
-merger.write(output_pdf)
-merger.close()
+output = os.path.join(folder, "merged.pdf")
 
-print(f"Successfully merged {len(input_pdfs)} PDFs into: {output_pdf}")
+with open(output, "wb") as f:
+    writer.write(f)
+
+print(f"\nMerged {len(pdf_files)} PDFs successfully!")
+print(f"Output: {output}")
