@@ -1,47 +1,69 @@
-import os
+from pathlib import Path
 import win32com.client as win32
-# bash this in terminal to download win32 thing  "python -m pip install pywin32"
 
-def convert_pptx_to_pdf(input_path):
-    powerpoint = win32.Dispatch("PowerPoint.Application")
-    powerpoint.Visible = 1
 
-    if os.path.isfile(input_path):
-        files = [input_path]
+def main():
+    print("\n=== POWERPOINT TO PDF ===")
+    print("1. Single file")
+    print("2. Entire folder")
 
-    elif os.path.isdir(input_path):
+    choice = input("Choose (1/2): ").strip()
+
+    if choice == "1":
+        src = Path(input("PPTX file path: ").strip().strip('"'))
+        if not src.is_file():
+            print("File not found.")
+            return
+
+        out = Path(input("Output PDF path: ").strip().strip('"'))
+        if out.suffix.lower() != ".pdf":
+            out = out / f"{src.stem}.pdf" if out.is_dir() else out.with_suffix(".pdf")
+
+        files = [(src, out)]
+
+    elif choice == "2":
+        src = Path(input("Source folder: ").strip().strip('"'))
+        out = Path(input("Output folder: ").strip().strip('"'))
+
+        if not src.is_dir():
+            print("Folder not found.")
+            return
+
+        out.mkdir(parents=True, exist_ok=True)
         files = [
-            os.path.join(input_path, f)
-            for f in os.listdir(input_path)
-            if f.lower().endswith(".pptx")
+            (f, out / f"{f.stem}.pdf")
+            for f in src.glob("*.pptx")
+            if not f.name.startswith("~$")
         ]
-
     else:
-        print("Error: File or folder not found.")
-        powerpoint.Quit()
+        print("Invalid choice.")
         return
 
-    for pptx_file in files:
-        pdf_file = os.path.splitext(pptx_file)[0] + ".pdf"
+    ppt = win32.DispatchEx("PowerPoint.Application")
 
-        print(f"Converting: {os.path.basename(pptx_file)}")
+    try:
+        for src_file, dst_file in files:
+            deck = None
+            try:
+                print("Converting:", src_file.name)
+                deck = ppt.Presentations.Open(
+                    str(src_file.resolve()),
+                    ReadOnly=True,
+                    Untitled=False,
+                    WithWindow=False,
+                )
+                deck.SaveAs(str(dst_file.resolve()), 32)
+                print("Done:", dst_file.name)
+            except Exception as e:
+                print("Failed:", src_file.name, e)
+            finally:
+                if deck:
+                    deck.Close()
+    finally:
+        ppt.Quit()
 
-        deck = powerpoint.Presentations.Open(
-            os.path.abspath(pptx_file),
-            WithWindow=False
-        )
-
-        deck.SaveAs(os.path.abspath(pdf_file), 32)
-        deck.Close()
-
-        print(f"Done: {os.path.basename(pdf_file)}")
-
-    powerpoint.Quit()
-
-    print("Successfully converted!")
+    print("\nConversion completed!")
 
 
-# Put either a .pptx FILE or a FOLDER here
-input_path = r"enter the directory of folder"
-
-convert_pptx_to_pdf(input_path)
+if __name__ == "__main__":
+    main()
