@@ -1,3 +1,4 @@
+from importlib import import_module
 from pathlib import Path
 from pypdf import PdfWriter
 import win32com.client as win32
@@ -124,6 +125,50 @@ def ppt_to_pdf():
         app.Quit()
 
     print("PowerPoint conversion completed!")
+
+
+def excel_to_pdf():
+    print("\n=== EXCEL TO PDF ===")
+    jobs = collect_office_jobs(
+        choose_mode(), "Excel file path: ", (".xlsx", ".xls", ".csv"), "Excel"
+    )
+    if jobs is None:
+        return
+    if not jobs:
+        print("No Excel files found.")
+        return
+
+    app = win32.DispatchEx("Excel.Application")
+    app.Visible = False
+    app.DisplayAlerts = False
+
+    try:
+        for src, out in jobs:
+            wb = None
+            try:
+                print("Converting:", src.name)
+                wb = app.Workbooks.Open(str(src), ReadOnly=True)
+                for ws in wb.Worksheets:
+                    try:
+                        ws.PageSetup.Zoom = False
+                        ws.PageSetup.FitToPagesWide = 1
+                        ws.PageSetup.FitToPagesTall = False
+                    except Exception:
+                        pass
+                wb.ExportAsFixedFormat(0, str(out))
+                wb.Close(False)
+                wb = None
+                make_pdf_searchable(out)
+                print("Done:", out.name)
+            except Exception as e:
+                print("Failed:", src.name, e)
+            finally:
+                if wb:
+                    wb.Close(False)
+    finally:
+        app.Quit()
+
+    print("Excel conversion completed!")
 
 
 def images_to_pdf():
@@ -271,9 +316,19 @@ def main():
     actions = {
         "1": word_to_pdf,
         "2": ppt_to_pdf,
-        "3": images_to_pdf,
-        "4": merge_pdfs,
-        "5": ocr_text,
+        "3": excel_to_pdf,
+        "4": images_to_pdf,
+        "5": import_module("text to pdf").main,
+        "6": import_module("pdf to images").main,
+        "7": import_module("pdf to word").main,
+        "8": import_module("image converter").main,
+        "9": ocr_text,
+        "10": merge_pdfs,
+        "11": import_module("split pdf").main,
+        "12": import_module("compress pdf").main,
+        "13": import_module("protect pdf").main,
+        "14": import_module("edit pages").main,
+        "15": import_module("watermark pdf").main,
     }
 
     while True:
@@ -282,15 +337,25 @@ def main():
         print("=" * 40)
         print("1. Word to PDF")
         print("2. PowerPoint to PDF")
-        print("3. Images to PDF")
-        print("4. Merge PDFs")
-        print("5. OCR (PDF/Image to Text)")
-        print("6. Exit")
+        print("3. Excel to PDF")
+        print("4. Images to PDF")
+        print("5. Text / Markdown / HTML to PDF")
+        print("6. PDF to Images")
+        print("7. PDF to Word")
+        print("8. Image Converter & Compressor")
+        print("9. OCR (PDF/Image to Text)")
+        print("10. Merge PDFs")
+        print("11. Split / Extract PDF")
+        print("12. Compress PDF")
+        print("13. Encrypt / Decrypt PDF")
+        print("14. Rotate / Reorder / Delete Pages")
+        print("15. Watermark & Page Numbers")
+        print("16. Exit")
         print("=" * 40)
 
         choice = input("Select operation: ").strip()
 
-        if choice == "6":
+        if choice == "16":
             print("Goodbye!")
             break
 
