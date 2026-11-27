@@ -1,4 +1,8 @@
+from pathlib import Path
+import html
 import importlib.util
+import io
+import re
 import subprocess
 import sys
 
@@ -14,21 +18,12 @@ pkgs = {
     "transformers": "transformers",
 }
 
-missing = [pkg for mod, pkg in pkgs.items() if importlib.util.find_spec(mod) is None]
-if missing:
-    print("Installing missing libraries:", ", ".join(missing))
-    subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
 
-from pathlib import Path
-import html
-import io
-import re
-import numpy as np
-import pymupdf
-from PIL import Image
-from pypdf import PdfReader, PdfWriter
-import win32com.client as win32
-from ocr import run_ocr, imgs_to_ocr_pdf, make_pdf_searchable
+def ensure_pkgs(*mods):
+    missing = [pkgs[m] for m in mods if importlib.util.find_spec(m) is None]
+    if missing:
+        print("Installing missing libraries:", ", ".join(missing))
+        subprocess.check_call([sys.executable, "-m", "pip", "install", *missing])
 
 
 def get_path(prompt):
@@ -109,6 +104,9 @@ def word_to_pdf():
             print("No Word files found.")
         return
 
+    ensure_pkgs("win32com")
+    import win32com.client as win32
+
     app = win32.DispatchEx("Word.Application")
     app.Visible = False
     app.DisplayAlerts = 0
@@ -122,7 +120,6 @@ def word_to_pdf():
                 doc.ExportAsFixedFormat(str(out), 17)
                 doc.Close(False)
                 doc = None
-                make_pdf_searchable(out)
                 print("Done:", out.name)
             except Exception as e:
                 print("Failed:", src.name, e)
@@ -143,6 +140,9 @@ def ppt_to_pdf():
             print("No PowerPoint files found.")
         return
 
+    ensure_pkgs("win32com")
+    import win32com.client as win32
+
     app = win32.DispatchEx("PowerPoint.Application")
 
     try:
@@ -156,7 +156,6 @@ def ppt_to_pdf():
                 deck.SaveAs(str(out), 32)
                 deck.Close()
                 deck = None
-                make_pdf_searchable(out)
                 print("Done:", out.name)
             except Exception as e:
                 print("Failed:", src.name, e)
@@ -176,6 +175,9 @@ def excel_to_pdf():
         if jobs == []:
             print("No Excel files found.")
         return
+
+    ensure_pkgs("win32com")
+    import win32com.client as win32
 
     app = win32.DispatchEx("Excel.Application")
     app.Visible = False
@@ -197,7 +199,6 @@ def excel_to_pdf():
                 wb.ExportAsFixedFormat(0, str(out))
                 wb.Close(False)
                 wb = None
-                make_pdf_searchable(out)
                 print("Done:", out.name)
             except Exception as e:
                 print("Failed:", src.name, e)
@@ -211,7 +212,7 @@ def excel_to_pdf():
 
 
 def images_to_pdf():
-    print("\n=== IMAGES TO PDF (WITH OCR) ===")
+    print("\n=== IMAGES TO PDF ===")
     mode = choose_mode()
     exts = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
 
@@ -245,9 +246,16 @@ def images_to_pdf():
         print("No supported images found.")
         return
 
+    ensure_pkgs("PIL")
+    from PIL import Image
+
     try:
-        imgs_to_ocr_pdf(images, out)
-        print(f"Successfully converted {len(images)} images with selectable text!")
+        pil_imgs = []
+        for f in images:
+            with Image.open(f) as img:
+                pil_imgs.append(img.convert("RGB"))
+        pil_imgs[0].save(str(out), "PDF", resolution=100.0, save_all=True, append_images=pil_imgs[1:])
+        print(f"Successfully converted {len(images)} image(s) to PDF!")
         print("Output:", out)
     except Exception as e:
         print("Image conversion failed:", e)
@@ -301,6 +309,9 @@ def text_to_pdf():
         if jobs == []:
             print("No matching files found.")
         return
+
+    ensure_pkgs("pymupdf")
+    import pymupdf
 
     for src, out in jobs:
         try:
@@ -371,6 +382,10 @@ def pdf_to_images():
 
     dpi_in = input("DPI (default 300): ").strip()
     dpi = int(dpi_in) if dpi_in.isdigit() else 300
+
+    ensure_pkgs("pymupdf")
+    import pymupdf
+
     mat = pymupdf.Matrix(dpi / 72, dpi / 72)
 
     for f in files:
@@ -401,6 +416,9 @@ def pdf_to_word():
             print("No PDF files found.")
         return
 
+    ensure_pkgs("win32com")
+    import win32com.client as win32
+
     app = win32.DispatchEx("Word.Application")
     app.Visible = False
     app.DisplayAlerts = 0
@@ -410,7 +428,6 @@ def pdf_to_word():
             doc = None
             try:
                 print("Converting:", src.name)
-                make_pdf_searchable(src)
                 doc = app.Documents.Open(str(src), ConfirmConversions=False, ReadOnly=True)
                 doc.SaveAs2(str(out), FileFormat=16)
                 doc.Close(False)
@@ -476,6 +493,9 @@ def image_converter():
     sz = input("Max width/height in px (Enter to skip): ").strip()
     max_size = int(sz) if sz.isdigit() and int(sz) > 0 else None
 
+    ensure_pkgs("PIL")
+    from PIL import Image
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for f in files:
@@ -529,6 +549,12 @@ def ocr_text():
     m = {"1": "auto", "2": "printed", "3": "handwritten"}.get(
         input("Choose (1/2/3): ").strip(), "auto"
     )
+    if m == "printed":
+        ensure_pkgs("pymupdf", "PIL", "pytesseract", "cv2", "numpy")
+    else:
+        ensure_pkgs("pymupdf", "PIL", "pytesseract", "cv2", "numpy", "torch", "transformers")
+    from ocr import run_ocr
+
     run_ocr(src, out_dir, m)
 
 
@@ -579,6 +605,9 @@ def merge_pdfs():
         print("No PDFs found.")
         return
 
+    ensure_pkgs("pypdf")
+    from pypdf import PdfWriter
+
     writer = PdfWriter()
     try:
         for pdf in files:
@@ -588,19 +617,12 @@ def merge_pdfs():
         out.parent.mkdir(parents=True, exist_ok=True)
         with open(out, "wb") as f:
             writer.write(f)
-    except Exception as e:
-        print("PDF merging failed:", e)
-        return
-    finally:
-        writer.close()
-
-    try:
-        print("Running OCR on scanned pages...")
-        make_pdf_searchable(out)
-        print(f"\nSuccessfully merged {len(files)} PDFs with selectable text!")
+        print(f"\nSuccessfully merged {len(files)} PDFs!")
         print("Output:", out)
     except Exception as e:
-        print("OCR step failed:", e)
+        print("PDF merging failed:", e)
+    finally:
+        writer.close()
 
 
 def split_pdf():
@@ -610,24 +632,34 @@ def split_pdf():
         print("Invalid PDF file.")
         return
 
-    reader = PdfReader(str(src))
-    total = len(reader.pages)
-    print(f"Total pages: {total}")
-
     print("\n1. Split into single-page PDFs")
     print("2. Extract page range (e.g. 1-3, 5, 8-10)")
     choice = input("Choose (1/2): ").strip()
 
+    if choice == "1":
+        out_dir = get_path("Output folder: ")
+    elif choice == "2":
+        out = get_output_path(src, ".pdf", "_extracted")
+    else:
+        print("Invalid choice.")
+        return
+
+    ensure_pkgs("pypdf")
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(str(src))
+    total = len(reader.pages)
+    print(f"Total pages: {total}")
+
     try:
         if choice == "1":
-            out_dir = get_path("Output folder: ")
             out_dir.mkdir(parents=True, exist_ok=True)
 
             for i, page in enumerate(reader.pages, 1):
                 writer = PdfWriter()
                 writer.add_page(page)
-                out = out_dir / f"{src.stem}_page_{i}.pdf"
-                with open(out, "wb") as f:
+                dst = out_dir / f"{src.stem}_page_{i}.pdf"
+                with open(dst, "wb") as f:
                     writer.write(f)
                 writer.close()
 
@@ -640,7 +672,6 @@ def split_pdf():
                 print("No valid pages selected.")
                 return
 
-            out = get_output_path(src, ".pdf", "_extracted")
             writer = PdfWriter()
             for idx in pages:
                 writer.add_page(reader.pages[idx])
@@ -650,8 +681,6 @@ def split_pdf():
             writer.close()
 
             print(f"\nExtracted {len(pages)} page(s) to {out}")
-        else:
-            print("Invalid choice.")
     except Exception as e:
         print("Failed:", e)
 
@@ -671,6 +700,13 @@ def compress_pdf():
 
     dpi = None if lvl == "1" else (100 if lvl == "3" else 150)
     quality = 55 if lvl == "3" else 75
+
+    if dpi:
+        ensure_pkgs("pymupdf", "PIL")
+        from PIL import Image
+    else:
+        ensure_pkgs("pymupdf")
+    import pymupdf
 
     for src, out in jobs:
         doc = None
@@ -746,6 +782,9 @@ def protect_pdf():
         print("Password cannot be empty.")
         return
 
+    ensure_pkgs("pymupdf")
+    import pymupdf
+
     for src, out in jobs:
         doc = None
         try:
@@ -782,6 +821,9 @@ def protect_pdf():
 
 
 def is_blank(pg):
+    import numpy as np
+    import pymupdf
+
     if pg.get_text().strip():
         return False
     pix = pg.get_pixmap(matrix=pymupdf.Matrix(1, 1), colorspace=pymupdf.csGRAY, alpha=False)
@@ -796,19 +838,28 @@ def edit_pages():
         print("Invalid PDF file.")
         return
 
-    doc = pymupdf.open(str(src))
-    total = doc.page_count
-    print(f"Total pages: {total}")
-
     print("\n1. Rotate pages")
     print("2. Reorder pages")
     print("3. Delete pages")
     print("4. Remove blank pages")
     act = input("Choose (1/2/3/4): ").strip()
+    if act not in ("1", "2", "3", "4"):
+        print("Invalid choice.")
+        return
 
     out = get_output_path(src, ".pdf", "_edited")
     same = src.resolve() == out.resolve()
     tmp = out.with_suffix(".tmp.pdf") if same else out
+
+    if act == "4":
+        ensure_pkgs("pymupdf", "numpy")
+    else:
+        ensure_pkgs("pymupdf")
+    import pymupdf
+
+    doc = pymupdf.open(str(src))
+    total = doc.page_count
+    print(f"Total pages: {total}")
 
     try:
         if act == "1":
@@ -888,6 +939,9 @@ def watermark_pdf():
         print("3. Bottom Left")
         p = input("Position (1/2/3): ").strip()
         pos = {"1": "right", "2": "center", "3": "left"}.get(p, "right")
+
+    ensure_pkgs("pymupdf")
+    import pymupdf
 
     for src, out in jobs:
         doc = None

@@ -1,11 +1,11 @@
 from pathlib import Path
-from ocr import imgs_to_ocr_pdf
+from PIL import Image
 
 exts = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
 
 
 def main():
-    print("\n=== IMAGES TO PDF (WITH OCR) ===")
+    print("\n=== IMAGES TO PDF ===")
     print("1. Single image")
     print("2. Entire folder (combine into one PDF)")
 
@@ -47,8 +47,13 @@ def main():
         return
 
     try:
-        imgs_to_ocr_pdf(images, out)
-        print(f"\nSuccessfully converted {len(images)} image(s) with selectable text.")
+        pil_imgs = []
+        for f in images:
+            with Image.open(f) as img:
+                pil_imgs.append(img.convert("RGB"))
+        out.parent.mkdir(parents=True, exist_ok=True)
+        pil_imgs[0].save(str(out), "PDF", resolution=100.0, save_all=True, append_images=pil_imgs[1:])
+        print(f"\nSuccessfully converted {len(images)} image(s) to PDF.")
         print("PDF saved:", out)
     except Exception as e:
         print("Conversion failed:", e)

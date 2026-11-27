@@ -1,10 +1,9 @@
 from pathlib import Path
 import win32com.client as win32
-from ocr import make_pdf_searchable
 
 
 def main():
-    print("\n=== WORD TO PDF (WITH OCR) ===")
+    print("\n=== WORD TO PDF ===")
     print("1. Single file")
     print("2. Entire folder")
 
@@ -53,7 +52,6 @@ def main():
                 doc.ExportAsFixedFormat(str(dst_file.resolve()), 17)
                 doc.Close(False)
                 doc = None
-                make_pdf_searchable(dst_file.resolve())
                 print("Done:", dst_file.name)
             except Exception as e:
                 print("Failed:", src_file.name, e)

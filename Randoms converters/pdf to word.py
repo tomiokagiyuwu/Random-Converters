@@ -1,6 +1,5 @@
 from pathlib import Path
 import win32com.client as win32
-from ocr import make_pdf_searchable
 
 
 def main():
@@ -52,7 +51,6 @@ def main():
             doc = None
             try:
                 print("Converting:", src_file.name)
-                make_pdf_searchable(src_file.resolve())
                 doc = word.Documents.Open(
                     str(src_file.resolve()), ConfirmConversions=False, ReadOnly=True
                 )

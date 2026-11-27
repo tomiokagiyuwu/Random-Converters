@@ -186,61 +186,6 @@ def ocr_file(f, mode):
     return "\n\n".join(pgs)
 
 
-def imgs_to_ocr_pdf(imgs, out):
-    set_tess()
-    doc = pymupdf.open()
-    try:
-        for f in imgs:
-            print("OCR & adding:", Path(f).name)
-            with Image.open(f) as img:
-                pdf_bytes = pytesseract.image_to_pdf_or_hocr(img.convert("RGB"), extension="pdf")
-            with pymupdf.open("pdf", pdf_bytes) as pg_doc:
-                doc.insert_pdf(pg_doc)
-        Path(out).parent.mkdir(parents=True, exist_ok=True)
-        doc.save(str(out))
-    finally:
-        doc.close()
-
-
-def make_pdf_searchable(pdf_path):
-    set_tess()
-    src = pymupdf.open(str(pdf_path))
-    out = pymupdf.open()
-    mat = pymupdf.Matrix(300 / 72, 300 / 72)
-    changed = False
-
-    try:
-        for i in range(src.page_count):
-            pg = src.load_page(i)
-            if len(pg.get_text().strip()) >= 15 and not pg.get_images():
-                out.insert_pdf(src, from_page=i, to_page=i)
-                continue
-
-            pix = pg.get_pixmap(matrix=mat, alpha=False)
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            pdf_bytes = pytesseract.image_to_pdf_or_hocr(img, extension="pdf")
-            with pymupdf.open("pdf", pdf_bytes) as ocr_pg:
-                if not pg.get_text().strip():
-                    out.insert_pdf(ocr_pg)
-                else:
-                    out.insert_pdf(src, from_page=i, to_page=i)
-                    new_pg = out[-1]
-                    for w in ocr_pg[0].get_text("words"):
-                        r = pymupdf.Rect(w[:4]) * (72 / 300)
-                        new_pg.insert_text(r.bl, w[4], fontsize=max(4, r.height * 0.8), render_mode=3)
-            changed = True
-
-        if changed:
-            tmp = Path(pdf_path).with_suffix(".tmp.pdf")
-            out.save(str(tmp))
-    finally:
-        src.close()
-        out.close()
-
-    if changed:
-        tmp.replace(pdf_path)
-
-
 def run_ocr(src, out_dir, mode="auto"):
     src = Path(src).expanduser().resolve()
     out_dir = Path(out_dir).expanduser().resolve()

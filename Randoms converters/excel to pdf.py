@@ -1,12 +1,11 @@
 from pathlib import Path
 import win32com.client as win32
-from ocr import make_pdf_searchable
 
 exts = (".xlsx", ".xls", ".csv")
 
 
 def main():
-    print("\n=== EXCEL TO PDF (WITH OCR) ===")
+    print("\n=== EXCEL TO PDF ===")
     print("1. Single file")
     print("2. Entire folder")
 
@@ -67,7 +66,6 @@ def main():
                 wb.ExportAsFixedFormat(0, str(dst_file.resolve()))
                 wb.Close(False)
                 wb = None
-                make_pdf_searchable(dst_file.resolve())
                 print("Done:", dst_file.name)
             except Exception as e:
                 print("Failed:", src_file.name, e)
