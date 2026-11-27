@@ -10,6 +10,8 @@ I will add more files with time :)
 
 Install everything at once:
 
+RUN THE BATCH FILE INSTALL BATCH TO DOWNLOAD EVERYTHING OR FOLLOW BELOW
+
 pip install pywin32 pypdf pymupdf pillow pytesseract opencv-python numpy torch transformers
 
 
