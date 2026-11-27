@@ -1,9 +1,10 @@
 from pathlib import Path
 from pypdf import PdfWriter
+from ocr import make_pdf_searchable
 
 
 def main():
-    print("\n=== PDF MERGER ===")
+    print("\n=== PDF MERGER (WITH OCR) ===")
     print("1. Merge selected PDF files")
     print("2. Merge all PDFs in a folder")
 
@@ -58,13 +59,19 @@ def main():
         out.parent.mkdir(parents=True, exist_ok=True)
         with open(out, "wb") as f:
             writer.write(f)
-
-        print(f"\nSuccessfully merged {len(files)} PDFs!")
-        print("Output:", out)
     except Exception as e:
         print("Merge failed:", e)
+        return
     finally:
         writer.close()
+
+    try:
+        print("Running OCR on scanned pages...")
+        make_pdf_searchable(out)
+        print(f"\nSuccessfully merged {len(files)} PDFs with selectable text!")
+        print("Output:", out)
+    except Exception as e:
+        print("OCR step failed:", e)
 
 
 if __name__ == "__main__":

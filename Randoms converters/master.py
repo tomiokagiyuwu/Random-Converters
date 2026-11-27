@@ -1,7 +1,7 @@
 from pathlib import Path
-import img2pdf
 from pypdf import PdfWriter
 import win32com.client as win32
+from ocr import run_ocr, imgs_to_ocr_pdf, make_pdf_searchable
 
 
 def get_path(prompt):
@@ -74,6 +74,9 @@ def word_to_pdf():
                 print("Converting:", src.name)
                 doc = app.Documents.Open(str(src), ReadOnly=True)
                 doc.ExportAsFixedFormat(str(out), 17)
+                doc.Close(False)
+                doc = None
+                make_pdf_searchable(out)
                 print("Done:", out.name)
             except Exception as e:
                 print("Failed:", src.name, e)
@@ -108,6 +111,9 @@ def ppt_to_pdf():
                     str(src), ReadOnly=True, Untitled=False, WithWindow=False
                 )
                 deck.SaveAs(str(out), 32)
+                deck.Close()
+                deck = None
+                make_pdf_searchable(out)
                 print("Done:", out.name)
             except Exception as e:
                 print("Failed:", src.name, e)
@@ -121,7 +127,7 @@ def ppt_to_pdf():
 
 
 def images_to_pdf():
-    print("\n=== IMAGES TO PDF ===")
+    print("\n=== IMAGES TO PDF (WITH OCR) ===")
     mode = choose_mode()
     exts = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
 
@@ -160,10 +166,8 @@ def images_to_pdf():
         return
 
     try:
-        with open(out, "wb") as pdf:
-            pdf.write(img2pdf.convert([str(f) for f in images]))
-
-        print(f"Successfully converted {len(images)} images!")
+        imgs_to_ocr_pdf(images, out)
+        print(f"Successfully converted {len(images)} images with selectable text!")
         print("Output:", out)
     except Exception as e:
         print("Image conversion failed:", e)
@@ -225,13 +229,42 @@ def merge_pdfs():
         out.parent.mkdir(parents=True, exist_ok=True)
         with open(out, "wb") as f:
             writer.write(f)
-
-        print(f"\nSuccessfully merged {len(files)} PDFs!")
-        print("Output:", out)
     except Exception as e:
         print("PDF merging failed:", e)
+        return
     finally:
         writer.close()
+
+    try:
+        print("Running OCR on scanned pages...")
+        make_pdf_searchable(out)
+        print(f"\nSuccessfully merged {len(files)} PDFs with selectable text!")
+        print("Output:", out)
+    except Exception as e:
+        print("OCR step failed:", e)
+
+
+def ocr_text():
+    print("\n=== OCR (PDF / IMAGES TO TEXT) ===")
+    mode = choose_mode()
+
+    if mode == "1":
+        src = get_path("File path: ")
+    elif mode == "2":
+        src = get_path("Source folder: ")
+    else:
+        print("Invalid choice.")
+        return
+
+    out_dir = get_path("Output folder: ")
+
+    print("\n1. Auto")
+    print("2. Printed")
+    print("3. Handwritten")
+    m = {"1": "auto", "2": "printed", "3": "handwritten"}.get(
+        input("Choose (1/2/3): ").strip(), "auto"
+    )
+    run_ocr(src, out_dir, m)
 
 
 def main():
@@ -240,6 +273,7 @@ def main():
         "2": ppt_to_pdf,
         "3": images_to_pdf,
         "4": merge_pdfs,
+        "5": ocr_text,
     }
 
     while True:
@@ -250,12 +284,13 @@ def main():
         print("2. PowerPoint to PDF")
         print("3. Images to PDF")
         print("4. Merge PDFs")
-        print("5. Exit")
+        print("5. OCR (PDF/Image to Text)")
+        print("6. Exit")
         print("=" * 40)
 
         choice = input("Select operation: ").strip()
 
-        if choice == "5":
+        if choice == "6":
             print("Goodbye!")
             break
 

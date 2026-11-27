@@ -1,9 +1,11 @@
 from pathlib import Path
-import img2pdf
+from ocr import imgs_to_ocr_pdf
+
+exts = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
 
 
 def main():
-    print("\n=== IMAGES TO PDF ===")
+    print("\n=== IMAGES TO PDF (WITH OCR) ===")
     print("1. Single image")
     print("2. Entire folder (combine into one PDF)")
 
@@ -11,8 +13,8 @@ def main():
 
     if choice == "1":
         src = Path(input("Image file path: ").strip().strip('"'))
-        if not src.is_file() or src.suffix.lower() not in (".jpg", ".jpeg"):
-            print("Valid JPG/JPEG file not found.")
+        if not src.is_file() or src.suffix.lower() not in exts:
+            print("Valid image file not found.")
             return
 
         out = Path(input("Output PDF path: ").strip().strip('"'))
@@ -31,10 +33,7 @@ def main():
 
         out.mkdir(parents=True, exist_ok=True)
         images = sorted(
-            (
-                f for f in src.iterdir()
-                if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg")
-            ),
+            (f for f in src.iterdir() if f.is_file() and f.suffix.lower() in exts),
             key=lambda f: f.name.lower(),
         )
         out = out / "output.pdf"
@@ -44,14 +43,12 @@ def main():
         return
 
     if not images:
-        print("No JPG/JPEG images found.")
+        print("No images found.")
         return
 
     try:
-        with open(out, "wb") as pdf:
-            pdf.write(img2pdf.convert([str(f) for f in images]))
-
-        print(f"\nSuccessfully converted {len(images)} image(s).")
+        imgs_to_ocr_pdf(images, out)
+        print(f"\nSuccessfully converted {len(images)} image(s) with selectable text.")
         print("PDF saved:", out)
     except Exception as e:
         print("Conversion failed:", e)

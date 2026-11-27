@@ -1,9 +1,10 @@
 from pathlib import Path
 import win32com.client as win32
+from ocr import make_pdf_searchable
 
 
 def main():
-    print("\n=== POWERPOINT TO PDF ===")
+    print("\n=== POWERPOINT TO PDF (WITH OCR) ===")
     print("1. Single file")
     print("2. Entire folder")
 
@@ -53,6 +54,9 @@ def main():
                     WithWindow=False,
                 )
                 deck.SaveAs(str(dst_file.resolve()), 32)
+                deck.Close()
+                deck = None
+                make_pdf_searchable(dst_file.resolve())
                 print("Done:", dst_file.name)
             except Exception as e:
                 print("Failed:", src_file.name, e)
